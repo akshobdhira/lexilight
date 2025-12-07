@@ -1,0 +1,5 @@
+---
+alwaysApply: true
+---
+the project should be modular, with proper indentation, no files can have more than 250 lines of code, make new file if exceeds and break the function to seperate files and make it work. 
+this project will have minimalistic white theme background. 
