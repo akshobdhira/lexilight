@@ -2,14 +2,16 @@ import React, { useState } from 'react';
 import './App.css';
 import PDFUpload from './components/PDFUpload';
 import HighlightedTextDisplay from './components/HighlightedTextDisplay';
+import PremiumDisplay from './components/PremiumDisplay';
 import { extractTextFromPDF } from './utils/pdfParser';
-import { analyzePolicyText, listAvailableModels } from './services/geminiService';
+import { analyzePolicyText } from './services/geminiService';
 
 function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [extractedText, setExtractedText] = useState('');
   const [highlightRules, setHighlightRules] = useState([]);
+  const [premiumEstimate, setPremiumEstimate] = useState(null);
   const [error, setError] = useState(null);
 
   const handleFileSelect = async (file) => {
@@ -29,32 +31,40 @@ function App() {
       setExtractedText(text);
       setIsLoading(false);
       
-      // Step 2: Analyze text with Gemini
+      // Step 2: Analyze text with backend API
+      console.log('🟢 [App] Starting backend analysis...');
       setIsAnalyzing(true);
       try {
-        // Debug: List available models (uncomment to debug)
-        // const availableModels = await listAvailableModels();
-        // console.log('Available models:', availableModels);
+        console.log('🟢 [App] Calling analyzePolicyText...');
+        const analysisResponse = await analyzePolicyText(text);
+        console.log('🟢 [App] Analysis complete. Full response:', analysisResponse);
+        console.log('=== Backend Analysis Results ===');
+        console.log(analysisResponse);
         
-        const analysisResults = await analyzePolicyText(text);
-        console.log('=== Gemini Analysis Results ===');
-        console.log(analysisResults);
+        // Extract premium estimate
+        if (analysisResponse.premiumEstimate) {
+          console.log('💰 [App] Setting premium estimate:', analysisResponse.premiumEstimate);
+          setPremiumEstimate(analysisResponse.premiumEstimate);
+        }
         
-        // Convert Gemini results to highlight rules
-        const rules = analysisResults.map((result) => ({
+        // Convert sentences to highlight rules
+        console.log('🟢 [App] Converting sentences to highlight rules...');
+        const rules = analysisResponse.sentences.map((result) => ({
           text: result.sentence,
-          color: result.color, // Hex color from Gemini
+          color: result.color, // Hex color from backend
           caseSensitive: false,
         }));
         
+        console.log('🟢 [App] Setting highlight rules:', rules.length, 'rules');
         setHighlightRules(rules);
-        console.log(`Found ${rules.length} sentences to highlight`);
-      } catch (geminiError) {
-        console.error('Error analyzing with Gemini:', geminiError);
-        setError(`Analysis error: ${geminiError.message}`);
+        console.log(`✅ [App] Found ${rules.length} sentences to highlight`);
+      } catch (backendError) {
+        console.error('❌ [App] Error analyzing with backend:', backendError);
+        setError(`Analysis error: ${backendError.message}`);
         // Still show the text even if analysis fails
       } finally {
         setIsAnalyzing(false);
+        console.log('🟢 [App] Analysis process completed');
       }
     } catch (error) {
       console.error('Error extracting PDF text:', error);
@@ -96,6 +106,7 @@ function App() {
   // Show only the extracted text once PDF is read
   return (
     <div className="App text-display">
+      <PremiumDisplay premiumEstimate={premiumEstimate} />
       <div className="app-container full-width">
         <HighlightedTextDisplay
           text={extractedText}

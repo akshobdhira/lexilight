@@ -1,179 +1,87 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
-
 /**
- * Gemini Service
- * Analyzes insurance policy text to identify risky and favorable sentences
+ * Policy Analysis Service
+ * Sends policy text to backend server for analysis
  */
 
-// Note: Create React App only exposes env variables prefixed with REACT_APP_
-// IMPORTANT: The variable MUST be named REACT_APP_GOOGLE_API_KEY (not REACT_GOOGLE_API_KEY)
-// Create React App filters out variables without the REACT_APP_ prefix, so they won't be accessible
-const API_KEY = process.env.REACT_APP_GOOGLE_API_KEY;
-
-if (!API_KEY) {
-  console.error('❌ Google API key not found!');
-  console.error('📝 If you have REACT_GOOGLE_API_KEY in your .env file, please rename it to REACT_APP_GOOGLE_API_KEY');
-  console.error('⚠️  Create React App requires the REACT_APP_ prefix for environment variables to be accessible in the browser.');
-}
-
-const genAI = API_KEY ? new GoogleGenerativeAI(API_KEY) : null;
-
-// Expose listAvailableModels globally for debugging in browser console
-if (typeof window !== 'undefined') {
-  window.listAvailableModels = async () => {
-    if (!genAI) {
-      console.error('API key not configured');
-      return;
-    }
-    return await listAvailableModels();
-  };
-  console.log('💡 Debug: Call listAvailableModels() in console to see available models');
-}
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
 
 /**
- * Lists available models for debugging
- * Call this to see what models are available with your API key
- */
-export const listAvailableModels = async () => {
-  if (!genAI) {
-    throw new Error('Google API key is not configured');
-  }
-  
-  try {
-    // Use the REST API directly to list models
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models?key=${API_KEY}`,
-      {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-    
-    if (!response.ok) {
-      throw new Error(`Failed to list models: ${response.status} ${response.statusText}`);
-    }
-    
-    const data = await response.json();
-    console.log('Available models:', data);
-    
-    if (data.models && data.models.length > 0) {
-      console.log('Model names:');
-      data.models.forEach((model) => {
-        console.log(`  - ${model.name}`);
-      });
-    }
-    
-    return data;
-  } catch (error) {
-    console.error('Error listing models:', error);
-    throw error;
-  }
-};
-
-/**
- * Analyzes insurance policy text and identifies risky/favorable sentences
+ * Analyzes insurance policy text by sending it to backend server
  * @param {string} policyText - The insurance policy text to analyze
- * @returns {Promise<Array>} Array of sentence objects with text and hex color
+ * @returns {Promise<Object>} Object containing success, premiumEstimate, and sentences
  */
 export const analyzePolicyText = async (policyText) => {
-  if (!genAI) {
-    throw new Error(
-      'Google API key is not configured.\n\n' +
-      'Please update your .env file:\n' +
-      '❌ Change: REACT_GOOGLE_API_KEY=...\n' +
-      '✅ To:     REACT_APP_GOOGLE_API_KEY=...\n\n' +
-      'Then restart your development server (npm start)'
-    );
-  }
+  console.log('🔵 [analyzePolicyText] Starting policy analysis...');
+  console.log('🔵 [analyzePolicyText] Policy text length:', policyText?.length || 0);
 
   if (!policyText || policyText.trim().length === 0) {
+    console.error('❌ [analyzePolicyText] Policy text is empty');
     throw new Error('Policy text is empty');
   }
 
-  const prompt = `You are an expert insurance policy analyst. Analyze the following insurance policy text and identify sentences that pose risks to the policyholder or are favorable to them.
-
-Your task:
-1. Identify sentences that pose HIGH RISK to the policyholder (exclusions, limitations, penalties, unfavorable terms) - mark these in RED (#e74c3c)
-2. Identify sentences that pose MEDIUM/MODERATE RISK (conditions, requirements, moderate limitations) - mark these in YELLOW (#f39c12)
-3. Identify sentences that are FAVORABLE to the policyholder (benefits, protections, rights, advantages) - mark these in GREEN (#27ae60)
-
-Return ONLY a valid JSON array. Each object in the array must have:
-- "sentence": The exact sentence text as it appears in the policy (preserve original formatting, spacing, and capitalization)
-- "color": The hex color code (#e74c3c for red, #f39c12 for yellow, #27ae60 for green)
-- "riskLevel": "high", "medium", or "favorable"
-
-Important:
-- Extract the EXACT sentence text as it appears in the document (do not paraphrase or modify)
-- Include punctuation and spacing exactly as in the original
-- If a sentence spans multiple lines, include it with the line breaks
-- Return an empty array [] if no risky or favorable sentences are found
-- Ensure the JSON is valid and parseable
-
-Policy text:
-${policyText}
-
-Return the JSON array now:`;
-
-  // Try different model names until one works
-  const modelNamesToTry = ['gemini-2.0-flash', 'gemini-pro', 'gemini-1.5-pro', 'gemini-1.5-flash'];
-  let result;
-  let lastError;
-  let workingModelName = null;
-  
-  for (const modelName of modelNamesToTry) {
-    try {
-      console.log(`Trying model: ${modelName}...`);
-      const model = genAI.getGenerativeModel({ model: modelName });
-      result = await model.generateContent(prompt);
-      workingModelName = modelName;
-      console.log(`✅ Successfully using model: ${modelName}`);
-      break;
-    } catch (err) {
-      lastError = err;
-      console.warn(`❌ Model ${modelName} failed:`, err.message);
-      // Continue to next model
-      continue;
-    }
-  }
-  
-  if (!result) {
-    // None of the models worked
-    console.error('❌ All model attempts failed');
-    console.error('💡 To see available models, run: listAvailableModels()');
-    throw new Error(
-      `No working Gemini model found. Tried: ${modelNamesToTry.join(', ')}\n` +
-      `Last error: ${lastError?.message || 'Unknown error'}\n\n` +
-      `💡 Run listAvailableModels() in browser console to see available models.`
-    );
-  }
+  const apiEndpoint = `${BACKEND_URL}/api/analyze-policy`;
+  console.log('🔵 [analyzePolicyText] Backend URL:', apiEndpoint);
 
   try {
-    const response = await result.response;
-    const text = response.text();
+    console.log('🔵 [analyzePolicyText] Sending request to backend...');
+    console.log('🔵 [analyzePolicyText] Request payload size:', JSON.stringify({ text: policyText }).length, 'bytes');
+    
+    const response = await fetch(apiEndpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        text: policyText,
+      }),
+    });
 
-    // Extract JSON from the response (might have markdown code blocks)
-    let jsonText = text.trim();
+    console.log('🔵 [analyzePolicyText] Response status:', response.status);
+    console.log('🔵 [analyzePolicyText] Response ok:', response.ok);
+    console.log('🔵 [analyzePolicyText] Response headers:', Object.fromEntries(response.headers.entries()));
 
-    // Remove markdown code blocks if present
-    if (jsonText.startsWith('```')) {
-      jsonText = jsonText.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '');
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ [analyzePolicyText] Backend error response:', errorText);
+      throw new Error(`Backend API error: ${response.status} ${response.statusText}`);
     }
 
-    // Try to parse the JSON
-    const sentences = JSON.parse(jsonText.trim());
-
-    if (!Array.isArray(sentences)) {
-      throw new Error('Invalid response format: expected an array');
+    console.log('🔵 [analyzePolicyText] Parsing JSON response...');
+    const data = await response.json();
+    
+    console.log('✅ [analyzePolicyText] Received response from backend:');
+    console.log('📋 [analyzePolicyText] Full response:', JSON.stringify(data, null, 2));
+    
+    // Validate response structure
+    if (!data || typeof data !== 'object') {
+      console.error('❌ [analyzePolicyText] Invalid response format:', typeof data);
+      throw new Error('Invalid response format: expected an object');
     }
 
-    // Validate and normalize the response
-    return sentences.map((item, index) => {
+    if (!data.success) {
+      console.error('❌ [analyzePolicyText] Backend returned success: false');
+      throw new Error('Backend analysis failed');
+    }
+
+    if (!Array.isArray(data.sentences)) {
+      console.error('❌ [analyzePolicyText] Sentences is not an array:', typeof data.sentences);
+      throw new Error('Invalid response format: sentences must be an array');
+    }
+
+    console.log('🔵 [analyzePolicyText] Response contains', data.sentences.length, 'sentences');
+    
+    if (data.premiumEstimate) {
+      console.log('💰 [analyzePolicyText] Premium estimate found:', data.premiumEstimate);
+    }
+
+    // Validate and normalize sentences
+    const validatedSentences = data.sentences.map((item, index) => {
       if (!item.sentence || typeof item.sentence !== 'string') {
+        console.error(`❌ [analyzePolicyText] Invalid sentence at index ${index}:`, item);
         throw new Error(`Invalid sentence at index ${index}: missing or invalid sentence field`);
       }
       if (!item.color || typeof item.color !== 'string') {
+        console.error(`❌ [analyzePolicyText] Invalid color at index ${index}:`, item);
         throw new Error(`Invalid color at index ${index}: missing or invalid color field`);
       }
 
@@ -189,32 +97,32 @@ Return the JSON array now:`;
             : 'favorable'),
       };
     });
+
+    console.log('✅ [analyzePolicyText] Validation complete. Returning', validatedSentences.length, 'sentences');
+    console.log('📊 [analyzePolicyText] Sentences breakdown:');
+    const colorCounts = validatedSentences.reduce((acc, item) => {
+      acc[item.color] = (acc[item.color] || 0) + 1;
+      return acc;
+    }, {});
+    console.log('📊 [analyzePolicyText] Color distribution:', colorCounts);
+    
+    // Return full response object
+    return {
+      success: data.success,
+      premiumEstimate: data.premiumEstimate || null,
+      sentences: validatedSentences,
+    };
   } catch (error) {
-    console.error('Error analyzing policy text with Gemini:', error);
+    console.error('❌ [analyzePolicyText] Error analyzing policy text:', error);
     
-    // Provide helpful error message for model not found
-    if (error.message && (error.message.includes('not found') || error.message.includes('404'))) {
-      console.error('\n💡 Model not found error detected!');
-      console.error('   This usually means:');
-      console.error('   1. The model name is incorrect for your API key');
-      console.error('   2. Your API key doesn\'t have access to this model');
-      console.error('   3. The model name format might be different');
-      console.error('\n   🔍 To find available models, open browser console and run:');
-      console.error('   listAvailableModels()');
-      console.error('\n   This will show you which models your API key can access.');
+    if (error.message && error.message.includes('Failed to fetch')) {
+      console.error('❌ [analyzePolicyText] Network error - is backend server running on', BACKEND_URL, '?');
+      throw new Error(
+        `Failed to connect to backend server at ${BACKEND_URL}.\n` +
+        `Please ensure the backend server is running on port 8000.`
+      );
     }
     
-    if (error.response) {
-      console.error('Gemini API response:', error.response);
-    }
-    
-    // Provide a more helpful error message
-    let errorMessage = `Failed to analyze policy text: ${error.message}`;
-    if (error.message && error.message.includes('not found')) {
-      errorMessage += '\n\n💡 Tip: Open browser console and run listAvailableModels() to see available models.';
-    }
-    
-    throw new Error(errorMessage);
+    throw new Error(`Failed to analyze policy text: ${error.message}`);
   }
 };
-
