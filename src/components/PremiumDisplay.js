@@ -19,16 +19,16 @@ const PremiumDisplay = ({ premiumEstimate }) => {
     }).format(amount);
   };
 
-  const getConfidenceColor = (confidence) => {
+  const getConfidenceText = (confidence) => {
     switch (confidence?.toLowerCase()) {
       case 'high':
-        return '#27ae60';
+        return 'Great price';
       case 'medium':
-        return '#f39c12';
+        return 'Good price';
       case 'low':
-        return '#e74c3c';
+        return 'Estimate';
       default:
-        return '#666666';
+        return 'Estimate';
     }
   };
 
@@ -39,15 +39,9 @@ const PremiumDisplay = ({ premiumEstimate }) => {
         {formatCurrency(premiumEstimate.monthlyPremium, premiumEstimate.currency)}
       </div>
       {premiumEstimate.confidence && (
-        <div 
-          className="premium-confidence"
-          style={{ color: getConfidenceColor(premiumEstimate.confidence) }}
-        >
-          {premiumEstimate.confidence.charAt(0).toUpperCase() + premiumEstimate.confidence.slice(1)} confidence
+        <div className="premium-confidence">
+          {getConfidenceText(premiumEstimate.confidence)}
         </div>
-      )}
-      {premiumEstimate.notes && (
-        <div className="premium-notes">{premiumEstimate.notes}</div>
       )}
     </div>
   );
